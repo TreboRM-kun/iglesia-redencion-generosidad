@@ -346,7 +346,7 @@ export function AdminPortal({ contributions, user, dataError, demoMode, readOnly
       <div className="admin-heading">
         <div><p className="eyebrow">PORTAL ADMINISTRATIVO</p><h1>Registro de generosidad</h1><small>{user}</small></div>
         <div>
-          {!demoMode && <button className="outline-button" type="button" onClick={() => { setPasswordError(''); setChangingPassword(true) }}>Cambiar contraseña</button>}
+          {!demoMode && <button hidden className="outline-button" type="button" onClick={() => { setPasswordError(''); setChangingPassword(true) }}>Cambiar contraseña</button>}
           <button className="outline-button" onClick={onSignOut}>{demoMode ? 'Volver al formulario' : 'Cerrar sesión'}</button>
         </div>
       </div>
