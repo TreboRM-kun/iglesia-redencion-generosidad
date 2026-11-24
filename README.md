@@ -60,11 +60,12 @@ Los administradores pueden validar, corregir o eliminar cualquier aporte. Si se 
 - Comprobantes: opcional, JPEG/PNG/WebP hasta 25 MB original, comprimido a WebP máximo 2 MB y guardado separado para no descargar imágenes al abrir la tabla.
 - Los registros reciben una marca de tiempo del servidor. Los reportes usan la fecha de Venezuela (America/Caracas).
 - Los reportes, totales y exportaciones incluyen únicamente aportes validados por un administrador. La validación debe hacerse después de verificar la transferencia o recibir el efectivo.
+- Los reportes se pueden exportar como CSV, XLSX, TXT o PDF, o imprimir; los formatos visuales incluyen el logo de la iglesia.
 - El sitio no verifica por sí mismo que el dinero haya llegado a la cuenta de la iglesia; esa comprobación corresponde al administrador.
 
 ## Recursos gráficos
 
-Las imágenes originales de la iglesia se conservan en `src/img`. La aplicación usa el icono de Redención en la barra superior y como favicon, y `bg1.jpeg` como fondo general de la página.
+Las imágenes originales de la iglesia se conservan en `src/img`. La aplicación usa el icono de Redención en la barra superior y como favicon, `lg1.png` en los reportes y `bg1.jpeg` como fondo limitado al área visible bajo la barra superior.
 
 ## Instalación como aplicación
 

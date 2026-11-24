@@ -7,6 +7,7 @@ import { csvCell } from '../utils/csv'
 import { dateInCaracas, periodStartDate, type Period } from '../utils/dates'
 import { escapeHtml } from '../utils/html'
 import { isContributionApproved } from '../utils/contribution-status'
+import { loadReportLogoDataUrl } from '../utils/report-logo'
 
 type EditForm = {
   name: string
@@ -90,6 +91,38 @@ export function AdminPortal({ contributions, user, dataError, demoMode, readOnly
     downloadBlob(blob, `aportes-${period}-${today}.csv`)
   }
 
+  async function downloadXlsx() {
+    try {
+      const { createXlsxReport, safeSpreadsheetText } = await import('../utils/xlsx')
+      const logoDataUrl = await loadReportLogoDataUrl()
+      const buffer = await createXlsxReport({
+        title: 'Reporte de Aportes Validados - Iglesia Redención',
+        period,
+        totals,
+        headers: ['Fecha', 'Nombre', 'Teléfono', 'Motivo', 'Monto', 'Moneda', 'Forma', 'Referencia', 'Registrado'],
+        rows: filtered.map(item => [
+          item.date,
+          safeSpreadsheetText(item.name),
+          safeSpreadsheetText(item.phone || ''),
+          item.reason,
+          item.amount,
+          item.currency,
+          item.method,
+          safeSpreadsheetText(item.reference || ''),
+          item.createdAt ? new Date(item.createdAt).toLocaleString('es-VE') : '',
+        ]),
+        logoDataUrl,
+      })
+      downloadBlob(
+        new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        `aportes-${period}-${today}.xlsx`,
+      )
+    } catch (error) {
+      console.error('No se pudo generar el reporte XLSX.', error)
+      window.alert('No se pudo generar el archivo Excel. Intente nuevamente.')
+    }
+  }
+
   function downloadTxt() {
     const lines = [
       `Reporte de aportes validados - ${period}`,
@@ -113,41 +146,53 @@ export function AdminPortal({ contributions, user, dataError, demoMode, readOnly
   async function downloadPdf() {
     try {
       const { jsPDF } = await import('jspdf')
+      const logoDataUrl = await loadReportLogoDataUrl()
       const pdf = new jsPDF({ orientation: 'landscape' })
-      pdf.setFontSize(16)
-      pdf.text('Reporte de Aportes Validados - Iglesia Redención', 14, 16)
-      pdf.setFontSize(10)
-      pdf.text(`Periodo: ${period} | Bs: ${totals.BS.toFixed(2)} | USD: ${totals.USD.toFixed(2)}`, 14, 24)
-      let y = 32
-      pdf.text('Fecha | Nombre | Motivo | Monto | Moneda | Forma | Referencia', 14, y)
-      y += 7
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const writeHeader = () => {
+        pdf.setFontSize(16)
+        pdf.text('Reporte de Aportes Validados - Iglesia Redención', 14, 16, { maxWidth: pageWidth - 58 })
+        pdf.addImage(logoDataUrl, 'PNG', pageWidth - 34, 5, 20, 20)
+        pdf.setFontSize(10)
+        pdf.text(`Período: ${period} | Bs: ${totals.BS.toFixed(2)} | USD: ${totals.USD.toFixed(2)}`, 14, 24)
+        pdf.text('Fecha | Nombre | Motivo | Monto | Moneda | Forma | Referencia', 14, 32)
+        return 39
+      }
+      let y = writeHeader()
       for (const item of filtered) {
         const lines = pdf.splitTextToSize(
           `${item.date} | ${item.name} | ${item.reason} | ${item.amount.toFixed(2)} | ${item.currency} | ${item.method} | ${item.reference || '-'}`,
-          269,
+          pageWidth - 28,
         )
         const height = lines.length * 5
-        if (y + height > 190) { pdf.addPage(); y = 16 }
+        if (y + height > 190) { pdf.addPage(); y = writeHeader() }
         pdf.text(lines, 14, y)
         y += height + 1
       }
       pdf.save(`aportes-${period}-${today}.pdf`)
     } catch (error) {
       console.error('No se pudo generar el reporte PDF.', error)
-      window.alert('No se pudo generar el PDF. Verifique la conexión e intente nuevamente.')
+      window.alert('No se pudo generar el PDF. Intente nuevamente.')
     }
   }
 
-  function printReport() {
+  async function printReport() {
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
       window.alert('Habilite las ventanas emergentes para imprimir el reporte.')
       return
     }
     printWindow.opener = null
-    const rows = filtered.map(item => `<tr><td>${escapeHtml(item.date)}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.reason)}</td><td>${item.amount.toFixed(2)}</td><td>${escapeHtml(item.currency)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.reference || '-')}</td></tr>`).join('')
-    printWindow.document.write(`<html><head><title>Reporte de aportes validados</title><style>body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;font-size:12px}h1{font-size:20px}</style></head><body><h1>Reporte de Aportes Validados - Iglesia Redención</h1><p>Período: ${escapeHtml(period)} — Bs: ${totals.BS.toFixed(2)} — USD: ${totals.USD.toFixed(2)}</p><table><thead><tr><th>Fecha</th><th>Nombre</th><th>Motivo</th><th>Monto</th><th>Moneda</th><th>Forma</th><th>Referencia</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`)
-    printWindow.document.close()
+    try {
+      const logoDataUrl = await loadReportLogoDataUrl()
+      const rows = filtered.map(item => `<tr><td>${escapeHtml(item.date)}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.reason)}</td><td>${item.amount.toFixed(2)}</td><td>${escapeHtml(item.currency)}</td><td>${escapeHtml(item.method)}</td><td>${escapeHtml(item.reference || '-')}</td></tr>`).join('')
+      printWindow.document.write(`<html><head><title>Reporte de aportes validados</title><style>body{font-family:Arial}.report-header{display:flex;align-items:center;justify-content:space-between;gap:24px}.report-header h1{font-size:20px;flex:1}.report-header img{width:72px;height:72px;object-fit:contain}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;font-size:12px}h1{font-size:20px}@media print{.report-header{break-inside:avoid}}</style></head><body><header class="report-header"><h1>Reporte de Aportes Validados - Iglesia Redención</h1><img src="${logoDataUrl}" alt="Logo Iglesia Redención"></header><p>Período: ${escapeHtml(period)} — Bs: ${totals.BS.toFixed(2)} — USD: ${totals.USD.toFixed(2)}</p><table><thead><tr><th>Fecha</th><th>Nombre</th><th>Motivo</th><th>Monto</th><th>Moneda</th><th>Forma</th><th>Referencia</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()</script></body></html>`)
+      printWindow.document.close()
+    } catch (error) {
+      console.error('No se pudo preparar el reporte para impresión.', error)
+      printWindow.close()
+      window.alert('No se pudo preparar el reporte para impresión. Intente nuevamente.')
+    }
   }
 
   async function viewReceipt(item: Contribution) {
@@ -344,7 +389,7 @@ export function AdminPortal({ contributions, user, dataError, demoMode, readOnly
       </div>
       <div className="period-row">
         <div className="period-tabs">{(['día', 'semana', 'mes', 'año'] as Period[]).map(value => <button key={value} className={period === value ? 'active' : ''} onClick={() => setPeriod(value)}>{value[0].toUpperCase() + value.slice(1)}</button>)}</div>
-        <div className="export-buttons"><button onClick={downloadCsv}>CSV</button><button onClick={downloadTxt}>TXT</button><button onClick={downloadPdf}>PDF</button><button onClick={printReport}>Imprimir</button></div>
+        <div className="export-buttons"><button onClick={downloadCsv}>CSV</button><button onClick={() => void downloadXlsx()}>XLSX</button><button onClick={downloadTxt}>TXT</button><button onClick={downloadPdf}>PDF</button><button onClick={() => void printReport()}>Imprimir</button></div>
       </div>
       <div className="table-wrap">
         <table>
